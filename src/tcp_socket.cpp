@@ -7,19 +7,14 @@
 #include "ur_modern_driver/log.h"
 #include "ur_modern_driver/tcp_socket.h"
 
-TCPSocket::TCPSocket() : socket_fd_(-1), state_(SocketState::Invalid)
+static const int EN_FLAG = 1;
+
+TCPSocket::TCPSocket(bool enable_qack, bool enable_nodelay) : enable_qack_(enable_qack), enable_nodelay_(enable_nodelay), socket_fd_(-1), state_(SocketState::Invalid)
 {
 }
 TCPSocket::~TCPSocket()
 {
   close();
-}
-
-void TCPSocket::setOptions(int socket_fd)
-{
-  int flag = 1;
-  setsockopt(socket_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int));
-  setsockopt(socket_fd, IPPROTO_TCP, TCP_QUICKACK, &flag, sizeof(int));
 }
 
 bool TCPSocket::setup(std::string &host, int port)
@@ -69,7 +64,10 @@ bool TCPSocket::setup(std::string &host, int port)
   }
   else
   {
-    setOptions(socket_fd_);
+    if (enable_nodelay_) {
+      setsockopt(socket_fd_, IPPROTO_TCP, TCP_NODELAY, &EN_FLAG, sizeof(EN_FLAG));
+    }
+
     state_ = SocketState::Connected;
     LOG_INFO("Connection established for %s:%d", host.c_str(), port);
   }
@@ -82,6 +80,10 @@ bool TCPSocket::setSocketFD(int socket_fd)
     return false;
   socket_fd_ = socket_fd;
   state_ = SocketState::Connected;
+
+  if (enable_nodelay_) {
+    setsockopt(socket_fd_, IPPROTO_TCP, TCP_NODELAY, &EN_FLAG, sizeof(EN_FLAG));
+  }
   return true;
 }
 
@@ -118,6 +120,10 @@ bool TCPSocket::read(uint8_t *buf, size_t buf_len, size_t &read)
   if (state_ != SocketState::Connected)
     return false;
 
+  if (enable_qack_) {
+    setsockopt(socket_fd_, IPPROTO_TCP, TCP_QUICKACK, &EN_FLAG, sizeof(EN_FLAG));
+  }
+
   ssize_t res = ::recv(socket_fd_, buf, buf_len, 0);
 
   if (res == 0)
@@ -144,6 +150,10 @@ bool TCPSocket::write(const uint8_t *buf, size_t buf_len, size_t &written)
   // handle partial sends
   while (written < buf_len)
   {
+    if (enable_qack_) {
+      setsockopt(socket_fd_, IPPROTO_TCP, TCP_QUICKACK, &EN_FLAG, sizeof(EN_FLAG));
+    }
+
     ssize_t sent = ::send(socket_fd_, buf + written, remaining, 0);
 
     if (sent <= 0)

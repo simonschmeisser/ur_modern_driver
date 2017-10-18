@@ -17,6 +17,8 @@ enum class SocketState
 class TCPSocket
 {
 private:
+  bool enable_qack_;
+  bool enable_nodelay_;
   std::atomic<int> socket_fd_;
   std::atomic<SocketState> state_;
 
@@ -25,12 +27,11 @@ protected:
   {
     return false;
   }
-  virtual void setOptions(int socket_fd);
 
   bool setup(std::string &host, int port);
 
 public:
-  TCPSocket();
+  TCPSocket(bool enable_quack = false, bool enable_nodelay = false);
   virtual ~TCPSocket();
 
   SocketState getState()

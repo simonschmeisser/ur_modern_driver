@@ -5,7 +5,7 @@
 #include <cstring>
 #include "ur_modern_driver/log.h"
 
-URServer::URServer(int port) : port_(port)
+URServer::URServer(int port) : port_(port), client_(true, true)
 {
 }
 
@@ -68,8 +68,6 @@ bool URServer::accept()
     if(retry++ >= 5)
       return false;
   }
-
-  TCPSocket::setOptions(client_fd);
 
   return client_.setSocketFD(client_fd);
 }
