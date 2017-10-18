@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 
   // RT packets
   auto rt_parser = factory.getRTParser();
-  URStream rt_stream(args.host, UR_RT_PORT);
+  URStream rt_stream(args.host, UR_RT_PORT, true);
   URProducer<RTPacket> rt_prod(rt_stream, *rt_parser);
   RTPublisher rt_pub(args.prefix, args.base_frame, args.tool_frame, args.use_ros_control);
   auto rt_commander = factory.getCommander(rt_stream);
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
 
   // Message packets
   auto state_parser = factory.getStateParser();
-  URStream state_stream(args.host, UR_SECONDARY_PORT);
+  URStream state_stream(args.host, UR_SECONDARY_PORT, false);
   URProducer<StatePacket> state_prod(state_stream, *state_parser);
   MBPublisher state_pub;
 

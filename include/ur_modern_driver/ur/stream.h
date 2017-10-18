@@ -22,7 +22,7 @@ protected:
   }
 
 public:
-  URStream(std::string& host, int port) : TCPSocket(true, true), host_(host), port_(port)
+  URStream(std::string& host, int port, bool realtime = false) : TCPSocket(realtime, false), host_(host), port_(port)
   {
   }
 
