@@ -5,7 +5,7 @@
 #include <cstring>
 #include "ur_modern_driver/log.h"
 
-URServer::URServer(int port) : port_(port), client_(true, true)
+URServer::URServer(int port) : port_(port), client_(true, false)
 {
 }
 
