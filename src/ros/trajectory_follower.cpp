@@ -67,8 +67,7 @@ end
 
 TrajectoryFollower::TrajectoryFollower(URCommander &commander, std::string &reverse_ip, int reverse_port,
                                        bool version_3)
-  : running_(false)
-  , commander_(commander)
+  : TrajectoryExecuter(commander)
   , server_(reverse_port)
   , servoj_time_(0.008)
   , servoj_lookahead_time_(0.03)
