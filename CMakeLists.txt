@@ -171,6 +171,8 @@ set(${PROJECT_NAME}_SOURCES
     src/ros/mb_publisher.cpp
     src/ros/rt_publisher.cpp
     src/ros/service_stopper.cpp
+    src/ros/trajectory_downloader.cpp
+    src/ros/trajectory_executer.cpp
     src/ros/trajectory_follower.cpp
     src/ros/urscript_handler.cpp
     src/ur/stream.cpp

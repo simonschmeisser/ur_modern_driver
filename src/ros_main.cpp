@@ -12,6 +12,7 @@
 #include "ur_modern_driver/ros/mb_publisher.h"
 #include "ur_modern_driver/ros/rt_publisher.h"
 #include "ur_modern_driver/ros/service_stopper.h"
+#include "ur_modern_driver/ros/trajectory_downloader.h"
 #include "ur_modern_driver/ros/trajectory_follower.h"
 #include "ur_modern_driver/ros/urscript_handler.h"
 #include "ur_modern_driver/ur/commander.h"
@@ -25,6 +26,7 @@
 static const std::string IP_ADDR_ARG("~robot_ip_address");
 static const std::string REVERSE_PORT_ARG("~reverse_port");
 static const std::string ROS_CONTROL_ARG("~use_ros_control");
+static const std::string TRAJ_DOWNLOADER_ARG("~use_trajectory_downloader");
 static const std::string MAX_VEL_CHANGE_ARG("~max_vel_change");
 static const std::string PREFIX_ARG("~prefix");
 static const std::string BASE_FRAME_ARG("~base_frame");
@@ -54,6 +56,7 @@ public:
   int32_t reverse_port;
   bool use_ros_control;
   bool shutdown_on_disconnect;
+  bool use_traj_downloader;
 };
 
 class IgnorePipelineStoppedNotifier : public INotifier
@@ -92,6 +95,7 @@ bool parse_args(ProgArgs &args)
   ros::param::param(MAX_VEL_CHANGE_ARG, args.max_vel_change, 15.0);  // rad/s
   ros::param::param(MAX_VEL_CHANGE_ARG, args.max_velocity, 10.0);
   ros::param::param(ROS_CONTROL_ARG, args.use_ros_control, false);
+  ros::param::param(TRAJ_DOWNLOADER_ARG, args.use_traj_downloader, false);
   ros::param::param(PREFIX_ARG, args.prefix, std::string());
   ros::param::param(BASE_FRAME_ARG, args.base_frame, args.prefix + "base_link");
   ros::param::param(TOOL_FRAME_ARG, args.tool_frame, args.prefix + "tool0_controller");
@@ -134,22 +138,28 @@ int main(int argc, char **argv)
   auto rt_commander = factory.getCommander(rt_stream);
   vector<IConsumer<RTPacket> *> rt_vec{ &rt_pub };
 
-  TrajectoryFollower traj_follower(*rt_commander, local_ip, args.reverse_port, factory.isVersion3());
+  std::unique_ptr<TrajectoryExecuter> traj_follower;
 
   INotifier *notifier(nullptr);
   ROSController *controller(nullptr);
   ActionServer *action_server(nullptr);
   if (args.use_ros_control)
   {
+    traj_follower.reset(new TrajectoryFollower(*rt_commander, local_ip, args.reverse_port, factory.isVersion3()));
     LOG_INFO("ROS control enabled");
-    controller = new ROSController(*rt_commander, traj_follower, args.joint_names, args.max_vel_change, args.tcp_link);
+    TrajectoryFollower &follower = dynamic_cast<TrajectoryFollower&>(*traj_follower);
+    controller = new ROSController(*rt_commander, follower, args.joint_names, args.max_vel_change, args.tcp_link);
     rt_vec.push_back(controller);
     services.push_back(controller);
   }
   else
   {
+    if (args.use_traj_downloader)
+        traj_follower.reset(new TrajectoryDownloader(*rt_commander, local_ip, args.reverse_port, factory.isVersion3()));
+    else
+        traj_follower.reset(new TrajectoryFollower(*rt_commander, local_ip, args.reverse_port, factory.isVersion3()));
     LOG_INFO("ActionServer enabled");
-    action_server = new ActionServer(traj_follower, args.joint_names, args.max_velocity);
+    action_server = new ActionServer(*traj_follower, args.joint_names, args.max_velocity);
     rt_vec.push_back(action_server);
     services.push_back(action_server);
   }

@@ -12,7 +12,7 @@
 #include <thread>
 #include "ur_modern_driver/log.h"
 #include "ur_modern_driver/ros/service_stopper.h"
-#include "ur_modern_driver/ros/trajectory_follower.h"
+#include "ur_modern_driver/ros/trajectory_executer.h"
 #include "ur_modern_driver/ur/consumer.h"
 #include "ur_modern_driver/ur/master_board.h"
 #include "ur_modern_driver/ur/state.h"
@@ -39,7 +39,7 @@ private:
   std::condition_variable tj_cv_;
   std::thread tj_thread_;
 
-  TrajectoryFollower& follower_;
+  TrajectoryExecuter& follower_;
 
   RobotState state_;
   std::array<double, 6> q_actual_, qd_actual_;
@@ -61,7 +61,7 @@ private:
   bool updateState(RTShared& data);
 
 public:
-  ActionServer(TrajectoryFollower& follower, std::vector<std::string>& joint_names, double max_velocity);
+  ActionServer(TrajectoryExecuter& follower, std::vector<std::string>& joint_names, double max_velocity);
 
   void start();
   virtual void onRobotStateChange(RobotState state);
