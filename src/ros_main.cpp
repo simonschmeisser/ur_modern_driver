@@ -143,6 +143,8 @@ int main(int argc, char **argv)
   ServiceStopper service_stopper(services);
 
   vector<IConsumer<StatePacket> *> state_vec{ &state_pub, &service_stopper };
+  if (action_server)
+      state_vec.push_back(action_server);
   MultiConsumer<StatePacket> state_cons(state_vec);
   Pipeline<StatePacket> state_pl(state_prod, state_cons);
 

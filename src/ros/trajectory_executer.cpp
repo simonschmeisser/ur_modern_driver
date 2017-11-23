@@ -6,7 +6,13 @@
 
 TrajectoryExecuter::TrajectoryExecuter(URCommander &commander)
   : running_(false)
+  , program_running_(false)
   , commander_(commander)
 {
+}
+
+void TrajectoryExecuter::update_program_running(bool program_running)
+{
+    program_running_ = program_running;
 }
 
