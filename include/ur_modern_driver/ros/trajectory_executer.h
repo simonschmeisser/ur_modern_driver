@@ -32,6 +32,7 @@ class TrajectoryExecuter
 {
 protected:
   std::atomic<bool> running_;
+  bool program_running_;
   URCommander &commander_;
 
 public:
@@ -41,4 +42,5 @@ public:
   virtual bool start() = 0;
   virtual bool execute(std::vector<TrajectoryPoint> &trajectory, std::atomic<bool> &interrupt) = 0;
   virtual void stop() = 0;
+  virtual void update_program_running(bool program_running);
 };

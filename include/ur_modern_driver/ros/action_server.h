@@ -17,7 +17,7 @@
 #include "ur_modern_driver/ur/master_board.h"
 #include "ur_modern_driver/ur/state.h"
 
-class ActionServer : public Service, public URRTPacketConsumer
+class ActionServer : public Service, public URRTPacketConsumer, public URStatePacketConsumer
 {
 private:
   typedef control_msgs::FollowJointTrajectoryAction Action;
@@ -35,6 +35,7 @@ private:
   GoalHandle curr_gh_;
   std::atomic<bool> interrupt_traj_;
   std::atomic<bool> has_goal_, running_;
+  std::atomic<bool> program_running_;
   std::mutex tj_mutex_;
   std::condition_variable tj_cv_;
   std::thread tj_thread_;
@@ -70,4 +71,13 @@ public:
   virtual bool consume(RTState_V1_8& state);
   virtual bool consume(RTState_V3_0__1& state);
   virtual bool consume(RTState_V3_2__3& state);
+  
+  virtual bool consume(MasterBoardData_V1_X& data);
+  virtual bool consume(MasterBoardData_V3_0__1& data);
+  virtual bool consume(MasterBoardData_V3_2& data);
+  
+  virtual bool consume(RobotModeData_V1_X& data);
+  virtual bool consume(RobotModeData_V3_0__1& data);
+  virtual bool consume(RobotModeData_V3_2& data);
+  
 };

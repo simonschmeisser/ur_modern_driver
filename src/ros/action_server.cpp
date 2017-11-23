@@ -10,6 +10,7 @@ ActionServer::ActionServer(TrajectoryExecuter& follower, std::vector<std::string
   , interrupt_traj_(false)
   , has_goal_(false)
   , running_(false)
+  , program_running_(false)
   , follower_(follower)
   , state_(RobotState::Error)
 {
@@ -76,7 +77,49 @@ bool ActionServer::consume(RTState_V3_0__1& state)
 }
 bool ActionServer::consume(RTState_V3_2__3& state)
 {
-  return updateState(state);
+    return updateState(state);
+}
+
+bool ActionServer::consume(MasterBoardData_V1_X& data)
+{
+    return true;
+}
+
+bool ActionServer::consume(MasterBoardData_V3_0__1& data)
+{
+    return true;
+}
+
+bool ActionServer::consume(MasterBoardData_V3_2& data)
+{
+    return true;
+}
+
+bool ActionServer::consume(RobotModeData_V1_X& data)
+{
+    if (program_running_ != data.program_running) {
+        program_running_.store(data.program_running);
+        follower_.update_program_running(data.program_running);
+    }
+    return true;
+}
+
+bool ActionServer::consume(RobotModeData_V3_0__1& data)
+{
+    if (program_running_ != data.program_running) {
+        program_running_.store(data.program_running);
+        follower_.update_program_running(data.program_running);
+    }
+    return true;
+}
+
+bool ActionServer::consume(RobotModeData_V3_2& data)
+{
+    if (program_running_ != data.program_running) {
+        program_running_.store(data.program_running);
+        follower_.update_program_running(data.program_running);
+    }
+    return true;
 }
 
 void ActionServer::onGoal(GoalHandle gh)
