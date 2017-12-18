@@ -25,6 +25,10 @@ bool TrajectoryDownloader::start()
 
 bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std::atomic<bool> &interrupt)
 {
+    typedef std::chrono::duration<double> double_seconds;
+    using namespace std::chrono;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+
   if (!running_)
     return false;
 
@@ -33,34 +37,92 @@ bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std
   auto &first = trajectory.front();
   auto &last = trajectory.back();
 
-
-  std::array<double, 6> positions;
-
   std::string program;
-  std::stringstream stream;
 
-  stream << "(\n";
-  stream << "def mikadoMove():\n";
-  for (auto const &point : trajectory)
-  {
-    // skip t0
-    if (&point == &first)
-      continue;
+  bool useServoJ = true;
 
-    stream << "movej(q=[";
-    for (size_t i = 0; i < 5; ++i)
-          stream << point.positions[i] << ",";
-    stream << point.positions[5];
-    if (&point != &last)
-        stream << "], r=0.005)\n";
-    else
-        stream << "])\n";
+  if (useServoJ) {
+
+      std::stringstream stream;
+      stream << "(\n";
+      stream << "def mikadoMove():\n";
+      stream << "  goals = [";
+      for (auto const &point : trajectory)
+      {
+        // skip t0
+        if (&point == &first) {
+            continue;
+        }
+
+        for (size_t i = 0; i < 5; ++i)
+              stream << point.positions[i] << ",";
+        stream << point.positions[5];
+        if (&point != &last)
+            stream << ","; //],
+        else
+            stream << ""; //]
+      }
+      stream << "]\n";
+
+      stream << "  dur = [";
+      double t = 0;
+      for (auto const &point : trajectory)
+      {
+
+        // skip t0
+        if (&point == &first) {
+            continue;
+        }
+        double dt = std::chrono::duration_cast<double_seconds>(point.time_from_start).count() - t;
+
+        if (&point != &last)
+            stream << dt << ",";
+        else
+            stream << 3.0*dt << "";
+        t = std::chrono::duration_cast<double_seconds>(point.time_from_start).count();
+      }
+      stream << "]\n";
+
+      stream << "  sync()\n"
+             << "  l = " << trajectory.size()-1 << "\n"  //did not include trajectory start
+             << "  i = 0\n"
+             << "  while i < l:\n"
+             << "    o = i*6\n"
+             << "    goal = [goals[o], goals[o+1], goals[o+2], goals[o+3], goals[o+4], goals[o+5]]\n"
+             << "    servoj(goal, t=dur[i])\n"
+             << "    i = i +1\n"
+             << "  end\n"
+             << "  stopj(0.5)\n"
+             << "end\n"
+             << ")\n";
+
+      program = stream.str();
+  } else {
+      std::stringstream stream;
+      stream << "(\n";
+      stream << "def mikadoMove():\n";
+      for (auto const &point : trajectory)
+      {
+        // skip t0
+        if (&point == &first)
+          continue;
+
+        stream << "movej(q=[";
+        for (size_t i = 0; i < 5; ++i)
+              stream << point.positions[i] << ",";
+        stream << point.positions[5];
+        if (&point != &last)
+            stream << "], r=0.005)\n";
+        else
+            stream << "])\n";
+      }
+      stream << "end\n";
+      stream << ")\n";
+
+      program = stream.str();
   }
-  stream << "end\n";
-  stream << ")\n";
 
   std::cout << "Final program is:" << std::endl;
-  program = stream.str();
   std::cout << program;
 
   LOG_INFO("Waiting for previous/other program to finish");
@@ -81,8 +143,14 @@ bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std
     LOG_ERROR("Program upload failed!");
     return false;
   }
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+  std::cout << "Creating and uploading programm took "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                << " ms.\n";
+
   //allow some time for status to change
-  std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
   LOG_INFO("Waiting for trajectory program to finish");
   {
