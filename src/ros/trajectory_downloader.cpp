@@ -25,6 +25,11 @@ bool TrajectoryDownloader::start()
 
 bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std::atomic<bool> &interrupt)
 {
+    double deceleration_factor = 2.0;
+    ros::param::param<double>("/deceleration_factor", deceleration_factor, deceleration_factor);
+    double stopj_deceleration = 1.0;
+    ros::param::param<double>("/stopj_deceleration", stopj_deceleration, stopj_deceleration);
+    
     typedef std::chrono::duration<double> double_seconds;
     using namespace std::chrono;
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -39,7 +44,7 @@ bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std
 
   std::string program;
 
-  bool useServoJ = true;
+  bool useServoJ = trajectory.size() > 2;
 
   if (useServoJ) {
 
@@ -78,7 +83,7 @@ bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std
         if (&point != &last)
             stream << dt << ",";
         else
-            stream << 3.0*dt << "";
+            stream << deceleration_factor*dt << "";
         t = std::chrono::duration_cast<double_seconds>(point.time_from_start).count();
       }
       stream << "]\n";
@@ -92,7 +97,7 @@ bool TrajectoryDownloader::execute(std::vector<TrajectoryPoint> &trajectory, std
              << "    servoj(goal, t=dur[i])\n"
              << "    i = i +1\n"
              << "  end\n"
-             << "  stopj(0.5)\n"
+             << "  stopj(" << stopj_deceleration << ")\n"
              << "end\n"
              << ")\n";
 
