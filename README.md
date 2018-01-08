@@ -1,4 +1,5 @@
-# ur_modern_driver
+# ur_modern_driver - Refactored
+[![Build Status](https://travis-ci.org/Zagitta/ur_modern_driver.svg?branch=master)](https://travis-ci.org/Zagitta/ur_modern_driver)
 
 A new driver for the UR3/UR5/UR10 robot arms from Universal Robots. It is designed to replace the old driver transparently, while solving some issues, improving usability as well as enabling compatibility  of ros_control. 
 
@@ -35,9 +36,12 @@ A new driver for the UR3/UR5/UR10 robot arms from Universal Robots. It is design
   * As ros_control continuesly controls the robot, using the teach pendant while a controller is running will cause the controller **on the robot** to crash, as it obviously can't handle conflicting control input from two sources. Thus be sure to stop the running controller **before** moving the robot via the teach pendant:
     * A list of the loaded and running controllers can be found by a call to the controller_manager ```rosservice call /controller_manager/list_controllers {} ```
     * The running position trajectory controller can be stopped with a call to  ```rosservice call /universal_robot/controller_manager/switch_controller "start_controllers: - '' stop_controllers: - 'pos_based_pos_traj_controller' strictness: 1" ``` (Remember you can use tab-completion for this)
-   
+
+* Added activation modes: `Never`, `Always` and `OnStartup`. Sets wether a call to the `ur_driver/robot_enable` service is required at startup, at startup + on errors or never. Is intended as a safety feature to require some sort of manual intervention in case of driver crashes and robot safety faults.
 
 ## Installation
+
+**As the driver communicates with the robot via ethernet and depends on reliable continous communication, it is not possible to reliably control a UR from a virtual machine.** 
 
 Just clone the repository into your catkin working directory and make it with ```catkin_make```.
 
@@ -49,6 +53,21 @@ The driver is designed to be a drop-in replacement of the ur\_driver package. It
 
 If you want to test it in your current setup, just use the modified launch files included in this package instead of those in ur\_bringup. Everything else should work as usual.
 
+If you would like to run this package to connect to the hardware, you only need to run the following launch file.
+```
+roslaunch ur_modern_driver urXX_bringup.launch robot_ip:=ROBOT_IP_ADDRESS
+```
+
+Where ROBOT_IP_ADDRESS is your UR arm's IP and XX is '5' or '10' depending on your robot. The above launch file makes calls to both roscore and the launch file to the urXX_description so that ROS's parameter server has information on your robot arm. If you do not have your ```ur_description``` installed please do so via:
+```
+sudo apt install ros-<distro>-ur-description
+```
+
+Where <distro> is the ROS distribution your machine is running on. You may want to run MoveIt to plan and execute actions on the arm. You can do so by simply entering the following commands after launching ```ur_modern_driver```:
+```
+roslaunch urXX_moveit_config ur5_moveit_planning_executing.launch
+roslaunch urXX_moveit_config moveit_rviz.launch config:=true
+```
 ---
 If you would like to use the ros\_control-based approach, use the launch files urXX\_ros\_control.launch, where XX is '5' or '10' depending on your robot.
 
@@ -143,3 +162,4 @@ Please cite the following report if using this driver
 
 
 The report can be downloaded from http://orbit.dtu.dk/en/publications/optimizing-the-universal-robots-ros-driver(20dde139-7e87-4552-8658-dbf2cdaab24b).html
+

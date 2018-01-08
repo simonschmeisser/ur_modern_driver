@@ -14,6 +14,7 @@
 #include "ur_modern_driver/ros/service_stopper.h"
 #include "ur_modern_driver/ros/trajectory_downloader.h"
 #include "ur_modern_driver/ros/trajectory_follower.h"
+#include "ur_modern_driver/ros/urscript_handler.h"
 #include "ur_modern_driver/ur/commander.h"
 #include "ur_modern_driver/ur/factory.h"
 #include "ur_modern_driver/ur/messages.h"
@@ -30,7 +31,9 @@ static const std::string MAX_VEL_CHANGE_ARG("~max_vel_change");
 static const std::string PREFIX_ARG("~prefix");
 static const std::string BASE_FRAME_ARG("~base_frame");
 static const std::string TOOL_FRAME_ARG("~tool_frame");
+static const std::string TCP_LINK_ARG("~tcp_link");
 static const std::string JOINT_NAMES_PARAM("hardware_interface/joints");
+static const std::string SHUTDOWN_ON_DISCONNECT_ARG("~shutdown_on_disconnect");
 
 static const std::vector<std::string> DEFAULT_JOINTS = { "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
                                                          "wrist_1_joint",      "wrist_2_joint",       "wrist_3_joint" };
@@ -45,14 +48,41 @@ public:
   std::string prefix;
   std::string base_frame;
   std::string tool_frame;
+  std::string tcp_link;
   std::vector<std::string> joint_names;
   double max_acceleration;
   double max_velocity;
   double max_vel_change;
   int32_t reverse_port;
   bool use_ros_control;
+  bool shutdown_on_disconnect;
   bool use_traj_downloader;
 };
+
+class IgnorePipelineStoppedNotifier : public INotifier
+{
+public:
+    void started(std::string name){
+        LOG_INFO("Starting pipeline %s", name.c_str());
+    }
+    void stopped(std::string name){
+        LOG_INFO("Stopping pipeline %s", name.c_str());
+    }
+};
+
+class ShutdownOnPipelineStoppedNotifier : public INotifier
+{
+public:
+    void started(std::string name){
+        LOG_INFO("Starting pipeline %s", name.c_str());
+    }
+    void stopped(std::string name){
+        LOG_INFO("Shutting down on stopped pipeline %s", name.c_str());
+        ros::shutdown();
+        exit(1);
+    }
+};
+
 
 bool parse_args(ProgArgs &args)
 {
@@ -69,7 +99,9 @@ bool parse_args(ProgArgs &args)
   ros::param::param(PREFIX_ARG, args.prefix, std::string());
   ros::param::param(BASE_FRAME_ARG, args.base_frame, args.prefix + "base_link");
   ros::param::param(TOOL_FRAME_ARG, args.tool_frame, args.prefix + "tool0_controller");
+  ros::param::param(TCP_LINK_ARG, args.tcp_link, args.prefix + "tool0");
   ros::param::param(JOINT_NAMES_PARAM, args.joint_names, DEFAULT_JOINTS);
+  ros::param::param(SHUTDOWN_ON_DISCONNECT_ARG, args.shutdown_on_disconnect, true);
   return true;
 }
 
@@ -108,6 +140,7 @@ int main(int argc, char **argv)
 
   std::unique_ptr<TrajectoryExecuter> traj_follower;
 
+  INotifier *notifier(nullptr);
   ROSController *controller(nullptr);
   ActionServer *action_server(nullptr);
   if (args.use_ros_control)
@@ -115,7 +148,7 @@ int main(int argc, char **argv)
     traj_follower.reset(new TrajectoryFollower(*rt_commander, local_ip, args.reverse_port, factory.isVersion3()));
     LOG_INFO("ROS control enabled");
     TrajectoryFollower &follower = dynamic_cast<TrajectoryFollower&>(*traj_follower);
-    controller = new ROSController(*rt_commander, follower, args.joint_names, args.max_vel_change);
+    controller = new ROSController(*rt_commander, follower, args.joint_names, args.max_vel_change, args.tcp_link);
     rt_vec.push_back(controller);
     services.push_back(controller);
   }
@@ -131,8 +164,21 @@ int main(int argc, char **argv)
     services.push_back(action_server);
   }
 
+  URScriptHandler urscript_handler(*rt_commander);
+  services.push_back(&urscript_handler);
+  if (args.shutdown_on_disconnect)
+  {
+    LOG_INFO("Notifier: Pipeline disconnect will shutdown the node");
+    notifier = new ShutdownOnPipelineStoppedNotifier();
+  }
+  else
+  {
+    LOG_INFO("Notifier: Pipeline disconnect will be ignored.");
+    notifier = new IgnorePipelineStoppedNotifier();
+  }
+
   MultiConsumer<RTPacket> rt_cons(rt_vec);
-  Pipeline<RTPacket> rt_pl(rt_prod, rt_cons);
+  Pipeline<RTPacket> rt_pl(rt_prod, rt_cons, "RTPacket", *notifier);
 
   // Message packets
   auto state_parser = factory.getStateParser();
@@ -146,7 +192,7 @@ int main(int argc, char **argv)
   if (action_server)
       state_vec.push_back(action_server);
   MultiConsumer<StatePacket> state_cons(state_vec);
-  Pipeline<StatePacket> state_pl(state_prod, state_cons);
+  Pipeline<StatePacket> state_pl(state_prod, state_cons, "StatePacket", *notifier);
 
   LOG_INFO("Starting main loop");
 

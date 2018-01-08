@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   control_msgs
   geometry_msgs
+  industrial_msgs
   roscpp
   sensor_msgs
   std_srvs
@@ -137,18 +138,23 @@ add_compile_options(-Wall)
 add_compile_options(-Wextra)
 add_compile_options(-Wno-unused-parameter)
 
+# support indigo's ros_control - This can be removed upon EOL indigo
+if("${controller_manager_msgs_VERSION}" VERSION_LESS "0.10.0")
+    add_definitions(-DUR_ROS_CONTROL_INTERFACE_OLD_ROS_CONTROL)
+endif()
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(include 
+include_directories(include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
 
 # Hardware Interface
-add_library(ur_hardware_interface 
-  src/ros/hardware_interface.cpp 
+add_library(ur_hardware_interface
+  src/ros/hardware_interface.cpp
   src/ros/controller.cpp)
 target_link_libraries(ur_hardware_interface
   ${catkin_LIBRARIES}
@@ -168,6 +174,7 @@ set(${PROJECT_NAME}_SOURCES
     src/ros/trajectory_downloader.cpp
     src/ros/trajectory_executer.cpp
     src/ros/trajectory_follower.cpp
+    src/ros/urscript_handler.cpp
     src/ur/stream.cpp
     src/ur/server.cpp
     src/ur/commander.cpp
